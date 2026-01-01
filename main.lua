@@ -1,4 +1,4 @@
-local introscene, nextScene
+local introscene, nextScene, blueScreenImg, currentTerminalBG
 local scaleX, scaleY, nextScaleX, nextScaleY
 local arcadeFont, terminalFont
 local gameStarted = false
@@ -11,10 +11,24 @@ local userInput = ""
 local maxInputLength = 61
 local prompt = "[os]$ "
 
+local cubeImg
+local cubeVisible = false
+local cubeClosing = false
+local cubeScale = 0
+local cubeRotation = 0
+local cubeSizeW = 0
+local cubeSizeH = 0
+
 function love.load()
     introscene = love.graphics.newImage("fullcomp.png")
     nextScene = love.graphics.newImage("screen.png")
+    blueScreenImg = love.graphics.newImage("bluescreen.png")
+    currentTerminalBG = nextScene
     
+    cubeImg = love.graphics.newImage("cube.png")
+    cubeSizeW = cubeImg:getWidth()
+    cubeSizeH = cubeImg:getHeight()
+
     scaleX = love.graphics.getWidth() / introscene:getWidth()
     scaleY = love.graphics.getHeight() / introscene:getHeight()
     nextScaleX = love.graphics.getWidth() / nextScene:getWidth()
@@ -38,7 +52,27 @@ function love.keypressed(key)
                 userInput = string.sub(userInput, 1, byteoffset - 1)
             end
         elseif key == "return" then
+            local command = userInput:gsub("%s+", ""):lower()
+            if command == "cube" then
+                cubeVisible = true
+                cubeClosing = false
+                cubeScale = 0
+                cubeRotation = 0
+            elseif command == "lol" then
+                currentTerminalBG = blueScreenImg
+            end
             userInput = ""
+        elseif key == "escape" then
+            if cubeVisible then
+                cubeClosing = true
+            elseif currentTerminalBG == blueScreenImg then
+                currentTerminalBG = nextScene
+            else
+                showFinal = false
+                zoomingOut = true
+                gameStarted = false
+                userInput = ""
+            end
         end
     end
 end
@@ -48,11 +82,20 @@ function love.update(dt)
         gameStarted = true
     end
 
-    if love.keyboard.isDown("escape") and (gameStarted or showFinal) then
-        showFinal = false
-        zoomingOut = true
-        gameStarted = false
-        userInput = ""
+    if cubeVisible then
+        cubeRotation = cubeRotation + (4 * dt)
+        
+        if cubeClosing then
+            cubeScale = cubeScale - (5 * dt)
+            if cubeScale <= 0 then
+                cubeScale = 0
+                cubeVisible = false
+                cubeClosing = false
+            end
+        elseif cubeScale < 1 then
+            cubeScale = cubeScale + (5 * dt)
+            if cubeScale > 1 then cubeScale = 1 end
+        end
     end
 
     if gameStarted and not showFinal then
@@ -100,17 +143,27 @@ function love.draw()
         end
     else
         love.graphics.setColor(1, 1, 1)
-        love.graphics.draw(nextScene, 0, 0, 0, nextScaleX, nextScaleY)
+        love.graphics.draw(currentTerminalBG, 0, 0, 0, nextScaleX, nextScaleY)
         
-        love.graphics.setFont(terminalFont)
-        love.graphics.setColor(0, 1, 0)
-        
-        local fullText = prompt .. userInput
-        local cursor = ""
-        if math.floor(love.timer.getTime() * 2) % 2 == 0 then
-            cursor = "_"
+        if currentTerminalBG == nextScene then
+            love.graphics.setFont(terminalFont)
+            love.graphics.setColor(0, 1, 0)
+            local fullText = prompt .. userInput
+            local cursor = ""
+            if math.floor(love.timer.getTime() * 2) % 2 == 0 then
+                cursor = "_"
+            end
+            love.graphics.print(fullText .. cursor, 50, 50)
         end
-        
-        love.graphics.print(fullText .. cursor, 50, 50)
+
+        if cubeVisible then
+            love.graphics.setColor(1, 1, 1, 1)
+            local cx = screenWidth / 2
+            local cy = screenHeight / 2
+            
+            local spinScaleX = math.cos(cubeRotation) * cubeScale
+            
+            love.graphics.draw(cubeImg, cx, cy, 0, spinScaleX, cubeScale, cubeSizeW / 2, cubeSizeH / 2)
+        end
     end
 end
